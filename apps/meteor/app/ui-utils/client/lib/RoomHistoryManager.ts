@@ -331,6 +331,7 @@ class RoomHistoryManagerClass extends Emitter {
 		const result = await callWithErrorHandling('loadSurroundingMessages', message, defaultLimit, showThreadMessages);
 
 		this.clear(message.rid);
+		this.updateRoom(message.rid, { isLoading: true });
 
 		if (!result) {
 			this.updateRoom(message.rid, { isLoading: false });

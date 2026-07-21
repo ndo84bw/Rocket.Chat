@@ -47,12 +47,6 @@ const useTryToJumpToMessage = ({ rid, virtualizerRef, setIsJumpingToMessage, mes
 		if (!message) {
 			return;
 		}
-		// Thread deep links are handled by useTryToJumpToThreadMessage; do not use the main list virtualizer
-		// If tshow is true, there is a preview on the main list, in this case we scroll to it
-		if (message && isThreadMessage(message) && !isThreadMainMessage(message) && message.tshow !== true) {
-			setIsJumpingToMessage(false);
-			return;
-		}
 		if (!isThreadMessage(message) && !isThreadMainMessage(message) && message.rid !== rid) {
 			setIsJumpingToMessage(false);
 			goToRoom(message.rid);
@@ -66,23 +60,24 @@ const useTryToJumpToMessage = ({ rid, virtualizerRef, setIsJumpingToMessage, mes
 		if (isLoadingMoreMessages || messages.length === 0) {
 			return;
 		}
-		const loadedMessage = messages.find((message) => message._id === messageJumpParam);
-		if (!loadedMessage) {
-			// Do not load surrounding messages for thread messages that have a tshow: true
-			// as these are previews on the main list and will be handled by useTryToJumpToThreadMessage
-			if (message && (!isThreadMessage(message) || isThreadMainMessage(message))) {
-				RoomHistoryManager.getSurroundingChannelMessages(message);
+
+		const isThreadReply = isThreadMessage(message) && !isThreadMainMessage(message) && message.tshow !== true;
+		const targetId = isThreadReply ? message.tmid : messageJumpParam;
+
+		const targetIndex = messages.findIndex((current) => current._id === targetId);
+		if (targetIndex < 0) {
+			if (message.rid === rid) {
+				RoomHistoryManager.getSurroundingChannelMessages({ _id: targetId, rid: message.rid });
 			}
 			return;
 		}
-		const messageIndex = messages.indexOf(loadedMessage);
 
 		// TODO: Calculate the offset of the page, for the message to be in the center of the page
-		virtualizerRef.current?.scrollToIndex(messageIndex, {
+		virtualizerRef.current?.scrollToIndex(targetIndex, {
 			align: 'center',
 		});
 
-		setHighlightMessage(loadedMessage._id);
+		setHighlightMessage(targetId);
 
 		setTimeout(() => {
 			clearHighlightMessage();
@@ -90,7 +85,9 @@ const useTryToJumpToMessage = ({ rid, virtualizerRef, setIsJumpingToMessage, mes
 
 		setTimeout(() => {
 			setIsJumpingToMessage(false);
-			setMessageJumpQueryStringParameter(null);
+			if (targetId === messageJumpParam) {
+				setMessageJumpQueryStringParameter(null);
+			}
 		}, 500);
 	}, [messageJumpParam, virtualizerRef, setIsJumpingToMessage, rid, messages, message, isLoadingMoreMessages, goToRoom]);
 };
