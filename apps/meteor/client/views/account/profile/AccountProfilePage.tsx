@@ -12,6 +12,7 @@ import {
 	useSetting,
 	useLayout,
 } from '@rocket.chat/ui-contexts';
+import { useQuery } from '@tanstack/react-query';
 import { useId, useState, useCallback } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 
@@ -36,8 +37,16 @@ const AccountProfilePage = () => {
 	const allowDeleteOwnAccount = useSetting('Accounts_AllowDeleteOwnAccount');
 	const { hasLocalPassword } = useAllowPasswordChange();
 
+	const blockedIds = user?.settings?.preferences?.statusVisibilityDenied as string[] | undefined;
+	const getUserInfo = useEndpoint('GET', '/v1/users.info');
+	const { data: ownInfo } = useQuery({
+		queryKey: ['account', 'profile', 'statusVisibilityDenied', user?._id],
+		queryFn: () => getUserInfo({ userId: user?._id ?? '' }),
+		enabled: Boolean(user?._id && blockedIds?.length),
+	});
+
 	const methods = useForm({
-		defaultValues: getProfileInitialValues(user),
+		values: getProfileInitialValues(user, ownInfo?.user.settings?.preferences?.statusVisibilityDenied),
 		reValidateMode: 'onBlur',
 	});
 

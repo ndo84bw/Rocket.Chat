@@ -49,6 +49,8 @@ import { SystemLogger } from '../../lib/logger/system';
 import { notifyOnUserChange, notifyOnUserChangeAsync } from '../../lib/notifyListener';
 import { resetUserE2EEncriptionKey } from '../../lib/resetUserE2EKey';
 import { validateNameChars } from '../../lib/shared/validateNameChars';
+import { redactStatus } from '../../lib/statusVisibility';
+import { buildStatusVisibilityChecker } from '../../lib/statusVisibilityChecker';
 import { checkEmailAvailability } from '../../lib/users/checkEmailAvailability';
 import { checkUsernameAvailability, checkUsernameAvailabilityWithValidation } from '../../lib/users/checkUsernameAvailability';
 import { deleteUser } from '../../lib/users/deleteUser';
@@ -247,7 +249,9 @@ API.v1
 				throw new Meteor.Error('error-invalid-user', 'The optional "userId" param provided does not match any users');
 			}
 
-			await saveUserPreferences(this.bodyParams.data, userId);
+			const { statusVisibilityDenied: _ownBlockList, ...preferences } = this.bodyParams.data;
+
+			await saveUserPreferences(userId === this.userId ? this.bodyParams.data : preferences, userId);
 			const user = await Users.findOneById(userId, {
 				projection: {
 					'settings.preferences': 1,
@@ -268,7 +272,7 @@ API.v1
 							language: user.language,
 						},
 					},
-				} as unknown as Required<Pick<IUser, '_id' | 'settings'>>,
+				},
 			});
 		},
 	)
@@ -763,8 +767,13 @@ API.v1.addRoute(
 				totalCount: [{ total } = { total: 0 }],
 			} = result[0];
 
+			const { canSee } = await buildStatusVisibilityChecker(
+				this.userId,
+				users.map(({ _id }: IUser) => _id),
+			);
+
 			return API.v1.success({
-				users,
+				users: users.map((user: IUser) => (canSee(user._id) ? user : redactStatus(user))),
 				count: users.length,
 				offset,
 				total,
@@ -1554,8 +1563,12 @@ API.v1.get(
 		};
 
 		if (ids) {
+			const requested = Array.isArray(ids) ? ids : ids.split(',');
+			const users = await Users.findPresenceUsersByIds(requested, options).toArray();
+			const { canSee } = await buildStatusVisibilityChecker(this.userId, requested);
+
 			return API.v1.success({
-				users: await Users.findPresenceUsersByIds(Array.isArray(ids) ? ids : ids.split(','), options).toArray(),
+				users: users.map((user) => (canSee(user._id) ? user : redactStatus(user))),
 				full: false,
 			});
 		}
@@ -1565,15 +1578,27 @@ API.v1.get(
 			const diff = (Date.now() - Number(ts)) / 1000 / 60;
 
 			if (diff < 10) {
+				const users = await Users.findNotIdUpdatedFrom(this.userId, ts, options).toArray();
+				const { canSee } = await buildStatusVisibilityChecker(
+					this.userId,
+					users.map(({ _id }) => _id),
+				);
+
 				return API.v1.success({
-					users: await Users.findNotIdUpdatedFrom(this.userId, ts, options).toArray(),
+					users: users.map((user) => (canSee(user._id) ? user : redactStatus(user))),
 					full: false,
 				});
 			}
 		}
 
+		const users = await Users.findUsersNotOffline(options).toArray();
+		const { canSee } = await buildStatusVisibilityChecker(
+			this.userId,
+			users.map(({ _id }) => _id),
+		);
+
 		return API.v1.success({
-			users: await Users.findUsersNotOffline(options).toArray(),
+			users: users.map((user) => (canSee(user._id) ? user : redactStatus(user))),
 			full: true,
 		});
 	},

@@ -13,9 +13,10 @@ export type AccountProfileFormValues = {
 	bio: string;
 	customFields: Record<string, string>;
 	nickname: string;
+	statusVisibilityDenied: string[];
 } & UserStatusInitialValues;
 
-export const getProfileInitialValues = (user: IUser | null): AccountProfileFormValues => {
+export const getProfileInitialValues = (user: IUser | null, blockedUsernames?: string[]): AccountProfileFormValues => {
 	return {
 		email: user ? getUserEmailAddress(user) || '' : '',
 		name: user?.name ?? '',
@@ -25,6 +26,7 @@ export const getProfileInitialValues = (user: IUser | null): AccountProfileFormV
 		bio: user?.bio ?? '',
 		customFields: user?.customFields ?? {},
 		nickname: user?.nickname ?? '',
+		statusVisibilityDenied: blockedUsernames ?? [],
 		...getUserStatusInitialValues(user),
 	};
 };

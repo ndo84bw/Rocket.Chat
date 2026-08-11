@@ -4,6 +4,8 @@ import { Users } from '@rocket.chat/models';
 
 import { settings } from '../../settings';
 import { hasPermissionAsync } from '../authorization/hasPermission';
+import { redactStatus } from '../statusVisibility';
+import { buildStatusVisibilityChecker } from '../statusVisibilityChecker';
 
 const logger = new Logger('getFullUserData');
 
@@ -38,6 +40,8 @@ export const fullFields = {
 	requirePasswordChangeReason: 1,
 	roles: 1,
 	importIds: 1,
+	statusVisibilityRoles: 1,
+	statusVisibilityDenied: 1,
 } as const;
 
 let publicCustomFields: Record<string, 0 | 1> = {};
@@ -120,7 +124,7 @@ export async function getFullUserDataByUniqueSearchTerm(
 	const options = {
 		projection: {
 			...fields,
-			...(myself && { services: 1 }),
+			...(myself && { 'services': 1, 'settings.preferences.statusVisibilityDenied': 1 }),
 		},
 	};
 
@@ -140,5 +144,24 @@ export async function getFullUserDataByUniqueSearchTerm(
 	delete user?.services?.resume;
 	delete user?.services?.email;
 
-	return user;
+	const ownBlockList: string[] | undefined = user.settings?.preferences?.statusVisibilityDenied;
+	const blockedIds = [...(canViewAllInfo ? (user.statusVisibilityDenied ?? []) : []), ...(myself ? (ownBlockList ?? []) : [])];
+
+	if (blockedIds.length) {
+		const blocked = await Users.findByIds<Pick<IUser, '_id' | 'username'>>(blockedIds, { projection: { username: 1 } }).toArray();
+		const usernameById = new Map(blocked.map(({ _id, username }) => [_id, username]));
+		const toUsernames = (ids: string[]) => ids.map((id) => usernameById.get(id)).filter((name): name is string => Boolean(name));
+
+		if (canViewAllInfo && user.statusVisibilityDenied?.length) {
+			user.statusVisibilityDenied = toUsernames(user.statusVisibilityDenied);
+		}
+
+		if (myself && ownBlockList?.length && user.settings?.preferences) {
+			user.settings.preferences.statusVisibilityDenied = toUsernames(ownBlockList);
+		}
+	}
+
+	const { canSee } = await buildStatusVisibilityChecker(userId, [user._id]);
+
+	return canSee(user._id) ? user : redactStatus(user);
 }

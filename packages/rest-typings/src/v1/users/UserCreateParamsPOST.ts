@@ -11,6 +11,8 @@ export type UserCreateParamsPOST = {
 	bio?: string;
 	nickname?: string;
 	statusText?: string;
+	statusVisibilityRoles?: string[];
+	statusVisibilityDenied?: string[];
 	roles?: string[];
 	joinDefaultChannels?: boolean;
 	requirePasswordChange?: boolean;
@@ -35,6 +37,8 @@ const userCreateParamsPostSchema = {
 		bio: { type: 'string', nullable: true },
 		nickname: { type: 'string', nullable: true },
 		statusText: { type: 'string', nullable: true },
+		statusVisibilityRoles: { type: 'array', items: { type: 'string' }, nullable: true },
+		statusVisibilityDenied: { type: 'array', items: { type: 'string' }, nullable: true },
 		roles: { type: 'array', items: { type: 'string' } },
 		joinDefaultChannels: { type: 'boolean', nullable: true },
 		requirePasswordChange: { type: 'boolean', nullable: true },

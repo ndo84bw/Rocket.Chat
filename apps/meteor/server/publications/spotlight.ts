@@ -4,6 +4,8 @@ import { Meteor } from 'meteor/meteor';
 
 import { methodDeprecationLogger } from '../lib/deprecationWarningLogger';
 import { Spotlight } from '../lib/spotlight';
+import { redactStatus } from '../lib/statusVisibility';
+import { buildStatusVisibilityChecker } from '../lib/statusVisibilityChecker';
 
 type SpotlightType = {
 	users?: boolean;
@@ -66,7 +68,12 @@ export const spotlightMethod = async ({
 		type.rooms ? spotlight.searchRooms({ userId, text, includeFederatedRooms }) : [],
 	]);
 
-	return { users, rooms };
+	const { canSee } = await buildStatusVisibilityChecker(
+		userId,
+		users.map(({ _id }) => _id),
+	);
+
+	return { users: users.map((user) => (canSee(user._id) ? user : redactStatus(user))), rooms };
 };
 
 Meteor.methods<ServerMethods>({

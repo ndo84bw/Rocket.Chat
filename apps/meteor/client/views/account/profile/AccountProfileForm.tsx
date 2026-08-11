@@ -26,14 +26,16 @@ import {
 } from '@rocket.chat/ui-contexts';
 import { useMutation } from '@tanstack/react-query';
 import type { AllHTMLAttributes, ChangeEvent } from 'react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useId, useMemo } from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
 
 import type { AccountProfileFormValues } from './getProfileInitialValues';
 import { useAccountProfileSettings } from './useAccountProfileSettings';
 import { getUserEmailAddress } from '../../../../lib/getUserEmailAddress';
+import UserAutoCompleteMultiple from '../../../components/UserAutoCompleteMultiple';
 import UserStatusMenu from '../../../components/UserStatusMenu';
 import UserAvatarEditor from '../../../components/avatar/UserAvatarEditor';
+import { useStatusVisibilityEnabled } from '../../../hooks/useStatusVisibilityEnabled';
 import { useUpdateAvatar } from '../../../hooks/useUpdateAvatar';
 import { USER_STATUS_TEXT_MAX_LENGTH, BIO_TEXT_MAX_LENGTH } from '../../../lib/constants';
 import { STATUS_DURATION_OPTIONS, validateStatusExpiration } from '../../../lib/statusDurations';
@@ -44,6 +46,9 @@ const AccountProfileForm = (props: AllHTMLAttributes<HTMLFormElement>) => {
 	const dispatchToastMessage = useToastMessageDispatch();
 	const { isMobile } = useLayout();
 
+	const setPreferences = useEndpoint('POST', '/v1/users.setPreferences');
+	const statusVisibilityEnabled = useStatusVisibilityEnabled();
+	const statusVisibilityDeniedId = useId();
 	const checkUsernameAvailability = useEndpoint('GET', '/v1/users.checkUsernameAvailability');
 	const sendConfirmationEmail = useEndpoint('POST', '/v1/users.sendConfirmationEmail');
 
@@ -138,6 +143,7 @@ const AccountProfileForm = (props: AllHTMLAttributes<HTMLFormElement>) => {
 			nickname,
 			bio,
 			customFields,
+			statusVisibilityDenied,
 		} = values;
 
 		const expiresAt = STATUS_DURATION_OPTIONS.find((o) => o.value === statusDuration)?.getExpiresAt?.({
@@ -164,6 +170,10 @@ const AccountProfileForm = (props: AllHTMLAttributes<HTMLFormElement>) => {
 				},
 				customFields,
 			});
+
+			if (dirtyFields.statusVisibilityDenied) {
+				await setPreferences({ data: { statusVisibilityDenied } });
+			}
 
 			if (statusDirty) {
 				await setUserStatus({
@@ -279,6 +289,21 @@ const AccountProfileForm = (props: AllHTMLAttributes<HTMLFormElement>) => {
 					{!allowUserStatusMessageChange && <FieldHint>{t('StatusMessage_Change_Disabled')}</FieldHint>}
 					{allowUserStatusMessageChange && <FieldHint>{t('Status_you_can_use_emoji')}</FieldHint>}
 				</Field>
+				{statusVisibilityEnabled && (
+					<Field>
+						<FieldLabel htmlFor={statusVisibilityDeniedId}>{t('Accounts_StatusVisibility_Denied_Own')}</FieldLabel>
+						<FieldRow>
+							<Controller
+								control={control}
+								name='statusVisibilityDenied'
+								render={({ field: { onChange, value } }) => (
+									<UserAutoCompleteMultiple id={statusVisibilityDeniedId} value={value} onChange={onChange} />
+								)}
+							/>
+						</FieldRow>
+						<FieldHint>{t('Accounts_StatusVisibility_Denied_Own_Description')}</FieldHint>
+					</Field>
+				)}
 				<Field>
 					<FieldLabel>{t('Status_clear_after')}</FieldLabel>
 					<FieldRow>

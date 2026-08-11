@@ -26,6 +26,8 @@ import { hasPermissionAsync } from '../../lib/authorization/hasPermission';
 import { eraseRoom } from '../../lib/eraseRoom';
 import { openRoom } from '../../lib/openRoom';
 import { getRoomByNameOrIdWithOptionToJoin } from '../../lib/rooms/getRoomByNameOrIdWithOptionToJoin';
+import { redactStatus } from '../../lib/statusVisibility';
+import { buildStatusVisibilityChecker } from '../../lib/statusVisibilityChecker';
 import { blockUserMethod } from '../../lib/users/blockUser';
 import { unblockUserMethod } from '../../lib/users/unblockUser';
 import { normalizeMessagesForUser } from '../../lib/utils/lib/normalizeMessagesForUser';
@@ -586,13 +588,18 @@ const dmMembersAction = <Path extends string>(_path: Path): TypedAction<typeof d
 			{ projection: { u: 1, status: 1, ts: 1, roles: 1 } },
 		).toArray();
 
+		const { canSee } = await buildStatusVisibilityChecker(
+			this.userId,
+			members.map(({ _id }) => _id),
+		);
+
 		const membersWithSubscriptionInfo = members.map((member) => {
 			const sub = subs.find((sub) => sub.u._id === member._id);
 
 			const { u: _u, ...subscription } = sub || {};
 
 			return {
-				...member,
+				...(canSee(member._id) ? member : redactStatus(member)),
 				subscription,
 			};
 		});

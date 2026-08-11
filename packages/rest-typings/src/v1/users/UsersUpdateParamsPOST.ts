@@ -13,6 +13,8 @@ export type UsersUpdateParamsPOST = {
 		bio?: string;
 		nickname?: string;
 		statusText?: string;
+		statusVisibilityRoles?: string[];
+		statusVisibilityDenied?: string[];
 		roles?: string[];
 		requirePasswordChange?: boolean;
 		setRandomPassword?: boolean;
@@ -66,6 +68,16 @@ const UsersUpdateParamsPostSchema = {
 				},
 				statusText: {
 					type: 'string',
+					nullable: true,
+				},
+				statusVisibilityRoles: {
+					type: 'array',
+					items: { type: 'string' },
+					nullable: true,
+				},
+				statusVisibilityDenied: {
+					type: 'array',
+					items: { type: 'string' },
 					nullable: true,
 				},
 				active: {

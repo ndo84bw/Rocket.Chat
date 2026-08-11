@@ -40,8 +40,10 @@ import PasswordFieldSkeleton from './PasswordFieldSkeleton';
 import { useSmtpQuery } from './hooks/useSmtpQuery';
 import { useShowVoipExtension } from './useShowVoipExtension';
 import { parseCSV } from '../../../../lib/utils/parseCSV';
+import UserAutoCompleteMultiple from '../../../components/UserAutoCompleteMultiple';
 import UserAvatarEditor from '../../../components/avatar/UserAvatarEditor';
 import { useEndpointMutation } from '../../../hooks/useEndpointMutation';
+import { useStatusVisibilityEnabled } from '../../../hooks/useStatusVisibilityEnabled';
 import { useUpdateAvatar } from '../../../hooks/useUpdateAvatar';
 import { USER_STATUS_TEXT_MAX_LENGTH, BIO_TEXT_MAX_LENGTH } from '../../../lib/constants';
 
@@ -84,6 +86,8 @@ const getInitialValue = ({
 	requirePasswordChange: isNewUserPage && isSmtpEnabled && (data?.requirePasswordChange ?? true),
 	customFields: data?.customFields ?? {},
 	statusText: data?.statusText ?? '',
+	statusVisibilityRoles: data?.statusVisibilityRoles ?? [],
+	statusVisibilityDenied: data?.statusVisibilityDenied ?? [],
 	freeSwitchExtension: data?.freeSwitchExtension ?? '',
 	...(isNewUserPage && { joinDefaultChannels: true }),
 	sendWelcomeEmail: isSmtpEnabled,
@@ -110,7 +114,7 @@ const AdminUserForm = ({ userData, onReload, context, refetchUserFormData, roleD
 		control,
 		watch,
 		handleSubmit,
-		formState: { errors, isDirty },
+		formState: { errors, isDirty, dirtyFields },
 		setValue,
 	} = useForm({
 		values: getInitialValue({
@@ -171,13 +175,18 @@ const AdminUserForm = ({ userData, onReload, context, refetchUserFormData, roleD
 	});
 
 	const handleSaveUser = useStableCallback(async (userFormPayload: UserFormProps) => {
-		const { avatar, passwordConfirmation, ...userFormData } = userFormPayload;
+		const { avatar, passwordConfirmation, statusVisibilityRoles, statusVisibilityDenied, ...userFormData } = userFormPayload;
+
+		const statusVisibility = {
+			...(dirtyFields.statusVisibilityRoles && { statusVisibilityRoles }),
+			...(dirtyFields.statusVisibilityDenied && { statusVisibilityDenied }),
+		};
 
 		if (!isNewUserPage && userData?._id) {
-			return handleUpdateUser.mutateAsync({ userId: userData?._id, data: userFormData });
+			return handleUpdateUser.mutateAsync({ userId: userData?._id, data: { ...userFormData, ...statusVisibility } });
 		}
 
-		return handleCreateUser.mutateAsync({ ...userFormData, fields: '' });
+		return handleCreateUser.mutateAsync({ ...userFormData, ...statusVisibility, fields: '' });
 	});
 
 	const nameId = useId();
@@ -186,6 +195,9 @@ const AdminUserForm = ({ userData, onReload, context, refetchUserFormData, roleD
 	const emailId = useId();
 	const verifiedId = useId();
 	const statusTextId = useId();
+	const statusVisibilityEnabled = useStatusVisibilityEnabled();
+	const statusVisibilityRolesId = useId();
+	const statusVisibilityDeniedId = useId();
 	const bioId = useId();
 	const nicknameId = useId();
 	const passwordId = useId();
@@ -499,6 +511,43 @@ const AdminUserForm = ({ userData, onReload, context, refetchUserFormData, roleD
 							</FieldError>
 						)}
 					</Field>
+					{statusVisibilityEnabled && (
+						<>
+							<Field>
+								<FieldLabel htmlFor={statusVisibilityRolesId}>{t('Accounts_StatusVisibility_Roles')}</FieldLabel>
+								<FieldRow>
+									<Controller
+										control={control}
+										name='statusVisibilityRoles'
+										render={({ field: { onChange, value } }) => (
+											<MultiSelectFiltered
+												id={statusVisibilityRolesId}
+												value={value}
+												onChange={onChange}
+												flexGrow={1}
+												placeholder={t('Select_role')}
+												options={availableRoles}
+											/>
+										)}
+									/>
+								</FieldRow>
+								<FieldHint>{t('Accounts_StatusVisibility_Roles_Description')}</FieldHint>
+							</Field>
+							<Field>
+								<FieldLabel htmlFor={statusVisibilityDeniedId}>{t('Accounts_StatusVisibility_Denied')}</FieldLabel>
+								<FieldRow>
+									<Controller
+										control={control}
+										name='statusVisibilityDenied'
+										render={({ field: { onChange, value } }) => (
+											<UserAutoCompleteMultiple id={statusVisibilityDeniedId} value={value} onChange={onChange} />
+										)}
+									/>
+								</FieldRow>
+								<FieldHint>{t('Accounts_StatusVisibility_Denied_Description')}</FieldHint>
+							</Field>
+						</>
+					)}
 					<Field>
 						<FieldLabel htmlFor={bioId}>{t('Bio')}</FieldLabel>
 						<FieldRow>

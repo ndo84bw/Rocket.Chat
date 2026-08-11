@@ -20,7 +20,9 @@ import { passwordPolicy } from '../../auth/passwordPolicy';
 import { hasPermissionAsync } from '../../authorization/hasPermission';
 import { callbacks } from '../../callbacks';
 import { notifyOnUserChange } from '../../notifyListener';
+import { resolveStatusVisibilityDenied } from '../../resolveStatusVisibilityDenied';
 import { shouldBreakInVersion } from '../../shouldBreakInVersion';
+import { notifyStatusVisibilityChanged } from '../../statusVisibilityChecker';
 import { saveCustomFields } from '../saveCustomFields';
 import { saveUserIdentity } from '../saveUserIdentity';
 import { setEmail } from '../setEmail';
@@ -37,6 +39,8 @@ export type SaveUserData = {
 	name?: string;
 
 	statusText?: string;
+	statusVisibilityRoles?: IRole['_id'][];
+	statusVisibilityDenied?: IUser['_id'][];
 	email?: string;
 	verified?: boolean;
 
@@ -138,6 +142,16 @@ const _saveUser = (session?: ClientSession) =>
 			await setStatusText(oldUserData, userData.statusText, { updater, session });
 		}
 
+		if (userData.statusVisibilityRoles || userData.statusVisibilityDenied) {
+			if (userData.statusVisibilityRoles) {
+				updater.set('statusVisibilityRoles', userData.statusVisibilityRoles);
+			}
+
+			if (userData.statusVisibilityDenied) {
+				updater.set('statusVisibilityDenied', await resolveStatusVisibilityDenied(userData.statusVisibilityDenied));
+			}
+		}
+
 		if (userData.email) {
 			const shouldSendVerificationEmailToUser = userData.verified !== true;
 			await setEmail(userData._id, userData.email, shouldSendVerificationEmailToUser, userData.verified === true, updater);
@@ -199,6 +213,10 @@ const _saveUser = (session?: ClientSession) =>
 		await Users.updateFromUpdater({ _id: userData._id }, updater, { session });
 
 		await onceTransactionCommitedSuccessfully(async () => {
+			if (userData.statusVisibilityRoles || userData.statusVisibilityDenied) {
+				notifyStatusVisibilityChanged({ targets: [userData._id] });
+			}
+
 			if (session && options?.auditStore) {
 				// setting this inside here to avoid moving `executeSetUserActiveStatus` from the endpoint fn
 				// updater will be commited by this point, so it won't affect the external user activation/deactivation

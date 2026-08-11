@@ -2324,6 +2324,26 @@ export class UsersRaw extends BaseRaw<IUser, DefaultFields<IUser>> implements IU
 		return this.findOne<T>(query, options);
 	}
 
+	findWithStatusVisibilityConfigByIds(users: IUser['_id'][]) {
+		return this.find(
+			{
+				_id: { $in: users },
+				$or: [
+					{ statusVisibilityRoles: { $exists: true, $ne: [] } },
+					{ statusVisibilityDenied: { $exists: true, $ne: [] } },
+					{ 'settings.preferences.statusVisibilityDenied': { $exists: true, $ne: [] } },
+				],
+			},
+			{
+				projection: {
+					'statusVisibilityRoles': 1,
+					'statusVisibilityDenied': 1,
+					'settings.preferences.statusVisibilityDenied': 1,
+				},
+			},
+		);
+	}
+
 	findPresenceUsersByIds(users: IUser['_id'][], options?: FindOptions<IUser>) {
 		const query = {
 			_id: { $in: users },

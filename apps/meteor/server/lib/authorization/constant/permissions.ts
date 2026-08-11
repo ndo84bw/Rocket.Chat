@@ -76,6 +76,7 @@ export const permissions = [
 	{ _id: 'view-device-management', roles: ['admin'] },
 	{ _id: 'view-engagement-dashboard', roles: ['admin'] },
 	{ _id: 'view-full-other-user-info', roles: ['admin'] },
+	{ _id: 'view-restricted-user-status', roles: ['admin'] },
 	{ _id: 'view-joined-room', roles: ['guest', 'bot', 'app', 'anonymous'] },
 	{ _id: 'view-join-code', roles: ['admin'] },
 	{ _id: 'view-logs', roles: ['admin'] },

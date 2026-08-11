@@ -13,6 +13,7 @@ import type { SaveUserData } from './saveUser';
 import { sendPasswordEmail, sendWelcomeEmail } from './sendUserEmail';
 import { getNewUserRoles } from '../../../services/user/lib/getNewUserRoles';
 import { settings } from '../../../settings';
+import { resolveStatusVisibilityDenied } from '../../resolveStatusVisibilityDenied';
 
 export const saveNewUser = async function (userData: SaveUserData, sendPassword: boolean, performedBy: IUser) {
 	await validateEmailDomain(userData.email);
@@ -58,6 +59,14 @@ export const saveNewUser = async function (userData: SaveUserData, sendPassword:
 
 	handleBio(updater, userData.bio);
 	handleNickname(updater, userData.nickname);
+
+	if (userData.statusVisibilityRoles?.length) {
+		updater.set('statusVisibilityRoles', userData.statusVisibilityRoles);
+	}
+
+	if (userData.statusVisibilityDenied?.length) {
+		updater.set('statusVisibilityDenied', await resolveStatusVisibilityDenied(userData.statusVisibilityDenied));
+	}
 
 	await Users.updateFromUpdater({ _id }, updater);
 
